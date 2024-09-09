@@ -288,7 +288,8 @@ func (o *chatSvr) RegisterUser(ctx context.Context, req *chat.RegisterUserReq) (
 	}
 	if req.User.UserID == "" {
 		for i := 0; i < 20; i++ {
-			userID := o.genUserID()
+			// userID := o.genUserID()
+			userID := req.User.PhoneNumber //PhoneNumber保持和UserID一致
 			_, err := o.Database.GetUser(ctx, userID)
 			if err == nil {
 				continue
