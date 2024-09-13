@@ -404,6 +404,29 @@ func (o *chatSvr) RegisterUser(ctx context.Context, req *chat.RegisterUserReq) (
 
 func (o *chatSvr) Login(ctx context.Context, req *chat.LoginReq) (*chat.LoginResp, error) {
 	resp := &chat.LoginResp{}
+
+	//验证用户token -----------begin
+	if req.Account == "" {
+		return nil, errs.ErrArgs.WrapMsg("DjtToken must be set")
+	}
+
+	djttoken := req.Account
+	touserid := req.VerifyCode
+	req.Account = ""    //过渡
+	req.VerifyCode = "" //过渡
+
+	djtResp, djterr := iMUserVerify(djttoken, touserid)
+	if djterr != nil {
+		return nil, djterr
+	}
+
+	if djtResp.Status != 1000 {
+		return nil, eerrs.ErrAccountNotFound.WrapMsg("会话已失效，请重新登录")
+	}
+	//验证用户token -----------end
+
+	req.PhoneNumber = djtResp.Data //userid
+
 	// if req.Password == "" && req.VerifyCode == "" {
 	// 	return nil, errs.ErrArgs.WrapMsg("password or code must be set")
 	// }
