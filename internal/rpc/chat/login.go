@@ -408,67 +408,65 @@ func (o *chatSvr) Login(ctx context.Context, req *chat.LoginReq) (*chat.LoginRes
 	// 	return nil, errs.ErrArgs.WrapMsg("password or code must be set")
 	// }
 	var err error
-	// var attribute *chatdb.Attribute
+	var attribute *chatdb.Attribute
 	// if req.Account != "" {
 	// 	attribute, err = o.Database.GetAttributeByAccount(ctx, req.Account)
-	// } else if req.PhoneNumber != "" {
-	// 	if req.AreaCode == "" {
-	// 		return nil, errs.ErrArgs.WrapMsg("area code must")
-	// 	}
-	// 	if req.AreaCode[0] != '+' {
-	// 		req.AreaCode = "+" + req.AreaCode
-	// 	}
-	// 	if _, err := strconv.ParseUint(req.AreaCode[1:], 10, 64); err != nil {
-	// 		return nil, errs.ErrArgs.WrapMsg("area code must be number")
-	// 	}
-	// 	attribute, err = o.Database.GetAttributeByPhone(ctx, req.AreaCode, req.PhoneNumber)
-	// } else if req.Email != "" {
-	// 	attribute, err = o.Database.GetAttributeByEmail(ctx, req.Email)
-	// } else {
-	// 	err = errs.ErrArgs.WrapMsg("account or phone number or email must be set")
-	// }
-	// if err != nil {
-	// 	if dbutil.IsDBNotFound(err) {
-	// 		return nil, eerrs.ErrAccountNotFound.WrapMsg("user unregistered")
-	// 	}
-	// 	return nil, err
-	// }
-	userID := req.PhoneNumber
-	if err := o.Admin.CheckLogin(ctx, userID, req.Ip); err != nil {
+	// } else
+	if req.PhoneNumber != "" {
+		if req.AreaCode == "" {
+			return nil, errs.ErrArgs.WrapMsg("area code must")
+		}
+		if req.AreaCode[0] != '+' {
+			req.AreaCode = "+" + req.AreaCode
+		}
+		if _, err := strconv.ParseUint(req.AreaCode[1:], 10, 64); err != nil {
+			return nil, errs.ErrArgs.WrapMsg("area code must be number")
+		}
+		attribute, err = o.Database.GetAttributeByPhone(ctx, req.AreaCode, req.PhoneNumber)
+	} else if req.Email != "" {
+		attribute, err = o.Database.GetAttributeByEmail(ctx, req.Email)
+	} else {
+		err = errs.ErrArgs.WrapMsg("account or phone number or email must be set")
+	}
+	if err != nil {
+		if dbutil.IsDBNotFound(err) {
+			return nil, eerrs.ErrAccountNotFound.WrapMsg("user unregistered")
+		}
+		return nil, err
+	}
+	if err := o.Admin.CheckLogin(ctx, attribute.UserID, req.Ip); err != nil {
 		return nil, err
 	}
 	var verifyCodeID *string
-	// if req.Password == "" {
-	// 	fmt.Println("Password")
-	// 	var account string
-	// 	if req.Email == "" {
-	// 		account = o.verifyCodeJoin(req.AreaCode, userID)
-	// 	} else {
-	// 		account = req.Email
-	// 	}
-	// 	id, err := o.verifyCode(ctx, account, req.VerifyCode)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	if id != "" {
-	// 		verifyCodeID = &id
-	// 	}
-	// } else {
-	// 	fmt.Println("phonellllll")
-	// 	account, err := o.Database.GetAccount(ctx, userID)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	if account.Password != req.Password {
-	// 		return nil, eerrs.ErrPassword.Wrap()
-	// 	}
-	// }
-	chatToken, err := o.Admin.CreateToken(ctx, userID, constant.NormalUser)
+	if req.Password == "" {
+		var account string
+		if req.Email == "" {
+			account = o.verifyCodeJoin(req.AreaCode, req.PhoneNumber)
+		} else {
+			account = req.Email
+		}
+		id, err := o.verifyCode(ctx, account, req.VerifyCode)
+		if err != nil {
+			return nil, err
+		}
+		if id != "" {
+			verifyCodeID = &id
+		}
+	} else {
+		account, err := o.Database.GetAccount(ctx, attribute.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if account.Password != req.Password {
+			return nil, eerrs.ErrPassword.Wrap()
+		}
+	}
+	chatToken, err := o.Admin.CreateToken(ctx, attribute.UserID, constant.NormalUser)
 	if err != nil {
 		return nil, err
 	}
 	record := &chatdb.UserLoginRecord{
-		UserID:    userID,
+		UserID:    attribute.UserID,
 		LoginTime: time.Now(),
 		IP:        req.Ip,
 		DeviceID:  req.DeviceID,
@@ -482,7 +480,7 @@ func (o *chatSvr) Login(ctx context.Context, req *chat.LoginReq) (*chat.LoginRes
 			return nil, err
 		}
 	}
-	resp.UserID = userID
+	resp.UserID = attribute.UserID
 	resp.ChatToken = chatToken.Token
 	return resp, nil
 }
