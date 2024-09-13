@@ -3,8 +3,15 @@ package chat
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
+
+	"github.com/openimsdk/tools/errs"
+	"gopkg.in/yaml.v3"
 )
 
 // 请求体 body参数 结构体
@@ -33,7 +40,38 @@ func HttpDo(req *http.Request) ([]byte, error) {
 	return body, nil
 }
 
+type DjtConfig struct {
+	EnterpriseUrl string `yaml:"enterpriseUrl"`
+}
+
 func iMUserVerify(djttoken string, touserid string) (*respParma, error) {
+	fmt.Println("iMUserVerifyiMUserVerify")
+
+	// 获取当前工作目录
+	wd, err := os.Getwd()
+	if err != nil {
+		fmt.Println("Error getting working directory:", err)
+		return nil, errs.ErrArgs.WrapMsg("Error getting working directory:", err)
+	}
+
+	fmt.Println("wd:" + wd)
+	rootDir := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(wd)))))
+	yamlFile, err := ioutil.ReadFile(rootDir + "/djt-config.yml")
+	if err != nil {
+		fmt.Printf("error reading YAML file: %v", err)
+		return nil, errs.ErrArgs.WrapMsg("error reading YAML file: %v", err)
+	}
+
+	var djtConfig DjtConfig
+	fmt.Print("读取")
+	err = yaml.Unmarshal(yamlFile, &djtConfig)
+	if err != nil {
+		fmt.Printf("error unmarshalling YAML: %v", err)
+		fmt.Print("读取失败")
+		return nil, errs.ErrArgs.WrapMsg("error unmarshalling YAML: %v", err)
+	}
+
+	fmt.Print("读取EnterpriseUrl：" + djtConfig.EnterpriseUrl)
 
 	//body参数
 	reqBody := reqBodyParmas{
@@ -41,7 +79,7 @@ func iMUserVerify(djttoken string, touserid string) (*respParma, error) {
 	}
 	reqJson, _ := json.Marshal(&reqBody)
 
-	request, err := http.NewRequest(http.MethodGet, "http://enterprise-admin-dev.51djt.net/api/Enterprise/IMUserVerify", bytes.NewReader(reqJson))
+	request, err := http.NewRequest(http.MethodGet, djtConfig.EnterpriseUrl+"/api/Enterprise/IMUserVerify", bytes.NewReader(reqJson))
 	if err != nil {
 		return nil, err
 	}
